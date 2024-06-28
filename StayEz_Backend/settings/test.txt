@@ -1,0 +1,185 @@
+import django_filters
+from rest_framework import filters
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import PropertyDetails, RoomDetails, Amenities
+
+class RoomDetailsFilter(django_filters.FilterSet):
+    price = django_filters.NumberFilter(field_name='price', lookup_expr='exact')
+    price__lt = django_filters.NumberFilter(field_name='price', lookup_expr='lt')
+    price__lte = django_filters.NumberFilter(field_name='price', lookup_expr='lte')
+    price__gt = django_filters.NumberFilter(field_name='price', lookup_expr='gt')
+    price__gte = django_filters.NumberFilter(field_name='price', lookup_expr='gte')
+    seater = django_filters.CharFilter(field_name='seater__name', lookup_expr='exact')
+    furnished = django_filters.CharFilter(field_name='furnished__name', lookup_expr='exact')
+    kitchen = django_filters.CharFilter(field_name='kitchen__name', lookup_expr='exact')
+    washroom = django_filters.CharFilter(field_name='washroom__name', lookup_expr='exact')
+
+    class Meta:
+        model = RoomDetails
+        fields = []
+
+class AnemitiesFilter(django_filters.FilterSet):
+    amnty = django_filters.CharFilter(field_name='amnty__name', lookup_expr='exact')
+
+    class Meta:
+        model = Amenities
+        fields = []
+
+class PropertyDetailsFilter(django_filters.FilterSet):
+    # price_range = filters.RangeFilter(field_name='price')
+    property_type = django_filters.CharFilter(field_name='property_type__name', lookup_expr='exact')
+    avl_for = django_filters.CharFilter(field_name='avl_for__name', lookup_expr='exact')
+    country = django_filters.CharFilter(field_name='country', lookup_expr='exact')
+    state = django_filters.CharFilter(field_name='state', lookup_expr='exact')
+    city = django_filters.CharFilter(field_name='city', lookup_expr='exact')
+    zip = django_filters.CharFilter(field_name='zip_code', lookup_expr='exact')
+    dist_from_college = django_filters.NumberFilter(field_name='dist_from_college', lookup_expr='exact')
+    dist_from_college__lt = django_filters.NumberFilter(field_name='dist_from_college', lookup_expr='lt')
+    dist_from_college__lte = django_filters.NumberFilter(field_name='dist_from_college', lookup_expr='lte')
+    dist_from_college__gt = django_filters.NumberFilter(field_name='dist_from_college', lookup_expr='gt')
+    dist_from_college__gte = django_filters.NumberFilter(field_name='dist_from_college', lookup_expr='gte')
+    rnt_pay_duration = django_filters.CharFilter(field_name='rnt_pay_duration__name', lookup_expr='exact')
+    security_charges = django_filters.NumberFilter(field_name='security_charges', lookup_expr='exact')
+    mess_facility = django_filters.BooleanFilter(field_name='mess_facility__name', lookup_expr='exact')
+    
+    # Nested filters for related models
+    room_detail = django_filters.ModelChoiceFilter(queryset=RoomDetails.objects.all(), method='filter_room_details')
+    ppty_detail = django_filters.ModelChoiceFilter(queryset=Amenities.objects.all(), method='filter_anemities')
+
+    class Meta:
+        model = PropertyDetails
+        fields = []
+
+    def filter_room_details(self, queryset, name, value):
+        room_filter_params = {f"ppty_detail__{key}": val for key, val in self.request.query_params.items() if key.startswith('room_detail__')}
+        if room_filter_params:
+            room_ids = RoomDetails.objects.filter(deleted_status=False, **room_filter_params).values_list('ppty_id', flat=True)
+            queryset = queryset.filter(id__in=room_ids)
+        return queryset
+
+    def filter_anemities(self, queryset, name, value):
+        amenity_filter_params = {f"ppty_amnt__{key}": val for key, val in self.request.query_params.items() if key.startswith('ppty_detail__')}
+        if amenity_filter_params:
+            amenity_ids = Amenities.objects.filter(deleted_status=False, **amenity_filter_params).values_list('ppty_id', flat=True)
+            queryset = queryset.filter(id__in=amenity_ids)
+        return queryset
+
+
+class FilterOptionsView(APIView):
+    def get(self, request, *args, **kwargs):
+        filter_options = {
+            'property_type': PropertyDetails.objects.values_list('property_type__name', flat=True).distinct(),
+            'avl_for': PropertyDetails.objects.values_list('avl_for__name', flat=True).distinct(),
+            'country': PropertyDetails.objects.values_list('country', flat=True).distinct(),
+            'state': PropertyDetails.objects.values_list('state', flat=True).distinct(),
+            'city': PropertyDetails.objects.values_list('city', flat=True).distinct(),
+            'zip': PropertyDetails.objects.values_list('zip_code', flat=True).distinct(),
+            'dist_from_college': PropertyDetails.objects.values_list('dist_from_college', flat=True).distinct(),
+            'rnt_pay_duration': PropertyDetails.objects.values_list('rnt_pay_duration__name', flat=True).distinct(),
+            'security_charges': PropertyDetails.objects.values_list('security_charges', flat=True).distinct(),
+            'mess_facility': PropertyDetails.objects.values_list('mess_facility__name', flat=True).distinct(),
+            'room_detail__price': RoomDetails.objects.values_list('price', flat=True).distinct(),
+            'room_detail__seater': RoomDetails.objects.values_list('seater__name', flat=True).distinct(),
+            'room_detail__furnished': RoomDetails.objects.values_list('furnished__name', flat=True).distinct(),
+            'room_detail__kitchen': RoomDetails.objects.values_list('kitchen__name', flat=True).distinct(),
+            'room_detail__washroom': RoomDetails.objects.values_list('washroom__name', flat=True).distinct(),
+            'ppty_detail__amnty': Amenities.objects.values_list('amnty__name', flat=True).distinct(),
+        }
+        return Response(filter_options)
+
+
+
+
+# serializers.py
+
+# from rest_framework import serializers
+# from .models import PropertyDetails, RoomDetails, Anemities, Dropdown
+
+# class AnemitiesListSerializer(serializers.ModelSerializer):
+#     aminity_name = serializers.CharField(source='amnty.name', required=False)
+    
+#     class Meta:
+#         model = Anemities
+#         fields = ['id', 'aminity_name']
+#         # fields = '__all__'
+
+# class PropertyListSerializer(serializers.ModelSerializer):
+#     ppty_amnt = AnemitiesListSerializer(many=True, required=False)
+#     property_type = serializers.CharField(source='property_type.name', required=False)
+#     avl_for_name = serializers.CharField(source='avl_for.name', required=False)
+#     near_college_name = serializers.CharField(source='near_college.name', required=False)
+#     mess_facility_name = serializers.CharField(source='mess_facility.name', required=False)
+#     rnt_pay_duration_name = serializers.CharField(source='rnt_pay_duration.name', required=False)
+    
+#     class Meta:
+#         model = PropertyDetails
+#         exclude = ['created_time', 'deleted_time', 'deleted_status']
+
+# class RoomListSerializer(serializers.ModelSerializer):
+#     ppty_detail = PropertyListSerializer(source='ppty',required=False)
+#     rm_amnt = AnemitiesListSerializer(many=True, required=False)
+#     seater = serializers.CharField(source='seater.name', required=False)
+#     furnished = serializers.CharField(source='furnished.name', required=False)
+#     kitchen = serializers.CharField(source='kitchen.name', required=False)
+#     washroom = serializers.CharField(source='washroom.name', required=False)
+    
+#     class Meta:
+#         model = RoomDetails
+#         exclude = ['created_time', 'deleted_time', 'deleted_status']
+
+
+
+# serializers.py
+# from rest_framework import serializers
+# from .models import PropertyDetails, Amenities
+
+# class AmenitiesSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Amenities
+#         fields = '__all__'
+
+# class PropertyDetailsSerializer(serializers.ModelSerializer):
+#     amenities = AmenitiesSerializer(many=True, required=False)
+
+#     class Meta:
+#         model = PropertyDetails
+#         fields = '__all__'
+
+#     def create(self, validated_data):
+#         amenities_data = validated_data.pop('amenities', [])
+#         property_instance = PropertyDetails.objects.create(**validated_data)
+#         for amenity_data in amenities_data:
+#             Amenities.objects.create(ppty=property_instance, **amenity_data)
+#         return property_instance
+
+
+
+class PropertyListView(generics.ListAPIView):
+    serializer_class = PropertyList2Serializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = PropertyDetails2Filter
+
+    def get_queryset(self):
+        queryset = PropertyDetails.objects.filter(deleted_status=False)
+        
+        return queryset
+    
+
+
+    
+
+# views.py
+
+# from rest_framework import generics
+# from .models import RoomDetails
+# from .serializers import RoomListSerializer
+
+# class RoomListView(generics.ListAPIView):
+#     queryset = RoomDetails.objects.all()
+#     serializer_class = RoomListSerializer
+
+
+# class RoomCreateView(generics.CreateAPIView):
+#     queryset = RoomDetails.objects.all()
+#     serializer_class = RoomDetailsSerializer
